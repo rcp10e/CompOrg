@@ -1,0 +1,242 @@
+/* Assembler code for LC3101 */
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+#define MAXLINELENGTH 1000
+#define MAXNUMLABELS 65536
+#define MAXLABELNAME 7
+int readAndParse(FILE *, char *, char *, char *, char *, char *);
+int isNumber(char *);
+void checkRegisterValues(char *, char *);
+
+
+
+/*opcode global constants*/
+#define ADDVAL 0
+#define NANDVAL 1
+#define LWVAL 2
+#define SWVAL 3
+#define BEQVAL 4
+#define JALRVAL 5
+#define HALTVAL 6
+#define NOOPVAL 7
+
+
+int
+main(int argc, char *argv[])
+{
+    	char *inFileString, *outFileString;
+    	FILE *inFilePtr, *outFilePtr;
+    	char label[MAXLINELENGTH], opcode[MAXLINELENGTH], arg0[MAXLINELENGTH],
+            	arg1[MAXLINELENGTH], arg2[MAXLINELENGTH];
+
+
+	int address; 
+	int i;	
+	int instructionVal = 0;
+	int lineCount = 0;
+	int temp;
+	int arg0Label;
+	int arg1Label;
+	int arg2Label;
+	int j;
+	int temp2;
+	char *tempchar;
+
+
+
+	struct labelStruct
+	{
+		char labelName[MAXLINELENGTH];
+		int labelAddress;
+	
+	};
+
+
+
+	struct labelStruct labelArray[MAXNUMLABELS];
+
+	
+
+	    
+    	/*check command line arguments */
+    	if (argc != 3)
+    	{
+        	printf("error: usage: %s <assembly-code-file> <machine-code-file>\n",
+            	argv[0]);
+        	exit(1);
+    	}
+
+    	inFileString = argv[1];
+   
+    	outFileString = argv[2];
+
+    	/*open infile to read stream */
+    	inFilePtr = fopen(inFileString, "r");
+   
+    	if (inFilePtr == NULL)
+    	{
+        	printf("error in opening %s\n", inFileString);
+        	exit(1);
+    	}
+   
+
+    	/*open outfile to write to */
+    	outFilePtr = fopen(outFileString, "w");
+   
+    	if (outFilePtr == NULL)
+    	{
+       	 	printf("error in opening %s\n", outFileString);
+        	exit(1);
+    	}
+
+   
+
+
+
+
+    	/*first pass to gather label names and store them in labelArray of structs*/
+   
+   	for(address = 0; readAndParse(inFilePtr, label, opcode, arg0, arg1, arg2); address++)
+ 	{
+    		
+		printf("%d: label=%s, opcode=%s, arg0=%s, arg1=%s, arg2=%s\n",
+			address, label, opcode, arg0, arg1, arg2);
+		
+		
+		labelArray[address].labelName = label;
+		labelArray[address].labelAddress = address;		
+	
+		lineCount++;
+
+		printf("\nlabelName = %s\t\t labelAddress = %d\t lineCount = %d\n", labelArray[address].labelName, labelArray[address].labelAddress, lineCount); 
+			
+		
+    	}
+
+   
+
+		
+	
+    	/* this is how to rewind the file ptr so that you start reading from the beginning of the file */
+    	rewind(inFilePtr);
+
+   
+	printf("\n\n\n\n");
+	for(address = 0; address < lineCount; address++)
+	{
+		printf("labelArray[%d].labelName = %s\n", address, labelArray[address].labelName);
+	} 
+	printf("\n\n\n\n");
+
+
+
+	/*second pass to generate machine code from assembly instructions*/
+	for(address = 0; readAndParse(inFilePtr, label, opcode, arg0, arg1, arg2); address++)
+	{
+		
+		temp = 0;
+		arg0Label = 0;
+		arg1Label = 0;   //bool flags
+		arg2Label = 0;
+		instructionVal = 0;		
+		j = 0;
+		
+
+		/*replace symbolic names with address */
+	
+	
+	
+	
+		/* check for .fill directive */
+
+		if(!strcmp(opcode, ".fill"))
+		{
+
+			if(isNumber(arg0))
+				printf("%s\n", arg0);
+			else
+			{
+				for(j = 0; j < lineCount; j++)
+				{	
+					if(!strcmp(arg0, labelArray[j].labelName))
+						printf("%d\n", labelArray[j].labelAddress);
+				}
+			} 
+		}
+	
+
+
+	}    	
+
+    return(0);
+}
+
+/*
+ * Read and parse a line of the assembly-language file.  Fields are returned
+ * in label, opcode, arg0, arg1, arg2 (these strings must have memory already
+ * allocated to them).
+ *
+ * Return values:
+ *     0 if reached end of file
+ *     1 if all went well
+ *
+ * exit(1) if line is too long.
+ */
+
+
+
+
+int
+readAndParse(FILE *inFilePtr, char *label, char *opcode, char *arg0,
+    char *arg1, char *arg2)
+{
+    char line[MAXLINELENGTH];
+    char *ptr = line;
+
+    /* delete prior values */
+    label[0] = opcode[0] = arg0[0] = arg1[0] = arg2[0] = '\0';
+
+    /* read the line from the assembly-language file */
+    if (fgets(line, MAXLINELENGTH, inFilePtr) == NULL) {
+	/* reached end of file */
+        return(0);
+    }
+
+    /* check for line too long (by looking for a \n) */
+    if (strchr(line, '\n') == NULL) {
+        /* line too long */
+	printf("error: line too long\n");
+	exit(1);
+    }
+
+    /* is there a label? */
+    ptr = line;
+    if (sscanf(ptr, "%[^\t\n ]", label)) {
+	/* successfully read label; advance pointer over the label */
+        ptr += strlen(label);
+    }
+
+    /*
+     * Parse the rest of the line.  Would be nice to have real regular
+     * expressions, but scanf will suffice.
+     */
+    sscanf(ptr, "%*[\t\n ]%[^\t\n ]%*[\t\n ]%[^\t\n ]%*[\t\n ]%[^\t\n ]%*[\t\n ]%[^\t\n ]",
+        opcode, arg0, arg1, arg2);
+    return(1);
+}
+
+
+
+
+
+
+int
+isNumber(char *string)
+{
+    /* return 1 if string is a number */
+    int i;
+    return( (sscanf(string, "%d", &i)) == 1);
+}
